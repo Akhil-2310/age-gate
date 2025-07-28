@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
 
     const selfBackendVerifier = new SelfBackendVerifier(
       "agegate",
-      "https://2f6b778ad88a.ngrok-free.app/api/verify",
+      "https://age-gate-nine.vercel.app/api/verify",
       true, // dev mode
       AllIds,
       configStore,

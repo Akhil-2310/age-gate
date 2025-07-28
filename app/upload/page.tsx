@@ -115,7 +115,7 @@ export default function UploadPage() {
         version: 2,
         appName: "AgeGate",
         scope: "agegate",
-        endpoint: "https://2f6b778ad88a.ngrok-free.app/api/verify",
+        endpoint: "https://age-gate-nine.vercel.app/api/verify",
         logoBase64: "https://i.postimg.cc/mrmVf9hm/self.png",
         userId: userId,
         endpointType: "staging_https",
