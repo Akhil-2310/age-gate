@@ -2,31 +2,80 @@
 
 import { useState, useEffect } from "react"
 import Image from "next/image"
-import { Lock, Eye, Calendar, User } from "lucide-react"
+import { Lock, Eye, Calendar, User, Shield } from "lucide-react"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
 import { supabase } from "@/lib/supabase"
 import type { Content } from "@/types/database"
+import {
+  SelfQRcodeWrapper,
+  SelfAppBuilder,
+  type SelfApp,
+} from "@selfxyz/qrcode"
+import { v4 as uuidv4 } from 'uuid'
 
 export default function ExplorePage() {
   const [content, setContent] = useState<Content[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedContent, setSelectedContent] = useState<Content | null>(null)
-  const [userAge] = useState(25) // Mock user age - in real app, get from auth
-  const [isAgeVerified] = useState(true) // Mock verification status
+  const [isAgeVerified, setIsAgeVerified] = useState(false) // Real verification status
+  const [showVerification, setShowVerification] = useState(false)
+  const [selfApp, setSelfApp] = useState<SelfApp | null>(null)
+  const [viewingUserId, setViewingUserId] = useState<string | null>(null)
+  const [isVerifying, setIsVerifying] = useState(false)
+  const [verificationError, setVerificationError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchContent()
+    generateViewingUserId()
+    
+    // Check if user was previously age verified or is an uploader
+    try {
+      const savedVerificationStatus = localStorage.getItem('ageGateVerified')
+      const uploaderUserId = localStorage.getItem('ageGateUploaderUserId')
+      
+      if (savedVerificationStatus === 'true') {
+        console.log('User was previously age verified')
+        setIsAgeVerified(true)
+      } else if (uploaderUserId) {
+        console.log('User is an uploader, automatically verified:', uploaderUserId)
+        setIsAgeVerified(true)
+        // Save verification status for consistency
+        localStorage.setItem('ageGateVerified', 'true')
+      }
+    } catch (error) {
+      console.warn('localStorage not available for verification check:', error)
+    }
   }, [])
+
+  const generateViewingUserId = () => {
+    try {
+      // Check if we already have a viewing user ID in localStorage
+      let userId = localStorage.getItem('ageGateViewingUserId')
+      
+      if (!userId) {
+        // Generate new ID only if one doesn't exist
+        userId = uuidv4()
+        localStorage.setItem('ageGateViewingUserId', userId)
+        console.log('Generated new viewing user ID:', userId)
+      } else {
+        console.log('Using existing viewing user ID:', userId)
+      }
+      
+      setViewingUserId(userId)
+    } catch (error) {
+      // Fallback if localStorage is not available
+      console.warn('localStorage not available, using session-only ID:', error)
+      const userId = uuidv4()
+      setViewingUserId(userId)
+    }
+  }
 
   const fetchContent = async () => {
     try {
       const { data, error } = await supabase
         .from("content")
-        .select(`
-          *,
-          uploader:users(name, email)
-        `)
+        .select("*")
         .eq("is_active", true)
         .order("created_at", { ascending: false })
 
@@ -40,18 +89,55 @@ export default function ExplorePage() {
   }
 
   const canViewContent = (contentItem: Content) => {
-    return isAgeVerified && userAge >= contentItem.minimum_age
+    return isAgeVerified // Age verification already confirms 18+, and all content requires 18+
   }
+
+  // Create Self app for age verification
+  useEffect(() => {
+    if (!viewingUserId) return
+    
+    console.log('Creating Self app with userId:', viewingUserId)
+    
+    try {
+      const app = new SelfAppBuilder({
+        version: 2,
+        appName: "AgeGate",
+        scope: "agegate",
+        endpoint: "https://2f6b778ad88a.ngrok-free.app/api/verify",
+        logoBase64: "https://i.postimg.cc/mrmVf9hm/self.png",
+        userId: viewingUserId,
+        endpointType: "staging_https",
+        userIdType: "uuid",
+        userDefinedData: "Welcome to AgeGate!",
+        devMode: true,
+        disclosures: {
+          minimumAge: 18,
+          ofac: false,
+          excludedCountries:[],
+        }
+      }).build();
+      
+      console.log('Self app created successfully:', app)
+      setSelfApp(app);
+    } catch (error) {
+      console.error('Failed to create Self app:', error)
+      setSelfApp(null)
+    }
+  }, [viewingUserId])
 
   const handleContentClick = (contentItem: Content) => {
     if (canViewContent(contentItem)) {
       setSelectedContent(contentItem)
+    } else {
+      // Show age verification modal
+      setShowVerification(true)
+      setVerificationError(null)
     }
   }
 
   const handleVerifyAge = () => {
-    // In a real app, this would trigger the Self Protocol verification
-    alert("Age verification would be handled by Self Protocol integration")
+    setShowVerification(true)
+    setVerificationError(null)
   }
 
   if (loading) {
@@ -90,17 +176,35 @@ export default function ExplorePage() {
                 </h3>
                 <p className="text-sm text-gray-600">
                   {isAgeVerified
-                    ? `Verified age: ${userAge} years old`
+                    ? "Verified as 18+ years old"
                     : "Complete age verification to access age-restricted content"}
                 </p>
               </div>
             </div>
-            {!isAgeVerified && (
+            {!isAgeVerified ? (
               <button
                 onClick={handleVerifyAge}
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Verify Age
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  try {
+                    localStorage.removeItem('ageGateVerified')
+                    localStorage.removeItem('ageGateViewingUserId')
+                    setIsAgeVerified(false)
+                    console.log('Cleared age verification and user ID')
+                    // Regenerate new viewing user ID
+                    generateViewingUserId()
+                  } catch (error) {
+                    console.warn('Could not clear verification data:', error)
+                  }
+                }}
+                className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors text-sm"
+              >
+                Clear Verification
               </button>
             )}
           </div>
@@ -125,7 +229,9 @@ export default function ExplorePage() {
                     alt={item.title}
                     width={400}
                     height={300}
-                    className="w-full h-48 object-cover"
+                    className={`w-full h-48 object-cover transition-all duration-300 ${
+                      !canView ? "blur-md" : ""
+                    }`}
                   />
 
                   {/* Age Restriction Overlay */}
@@ -133,15 +239,15 @@ export default function ExplorePage() {
                     <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
                       <div className="text-center text-white">
                         <Lock className="h-8 w-8 mx-auto mb-2" />
-                        <p className="font-semibold">{item.minimum_age}+ Only</p>
-                        <p className="text-sm">Age verification required</p>
+                        <p className="font-semibold">18+ Content</p>
+                        <p className="text-sm">Click to verify age and view</p>
                       </div>
                     </div>
                   )}
 
                   {/* Age Badge */}
                   <div className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded text-xs font-semibold">
-                    {item.minimum_age}+
+                    18+
                   </div>
                 </div>
 
@@ -153,7 +259,7 @@ export default function ExplorePage() {
                   <div className="flex items-center justify-between text-xs text-gray-500">
                     <div className="flex items-center">
                       <User className="h-3 w-3 mr-1" />
-                      <span>{item.uploader?.name || "Anonymous"}</span>
+                      <span>User {item.uploader_id?.slice(0, 8) || "Anonymous"}</span>
                     </div>
                     <div className="flex items-center">
                       <Calendar className="h-3 w-3 mr-1" />
@@ -202,14 +308,115 @@ export default function ExplorePage() {
               <div className="flex items-center justify-between text-sm text-gray-500">
                 <div className="flex items-center">
                   <User className="h-4 w-4 mr-1" />
-                  <span>By {selectedContent.uploader?.name || "Anonymous"}</span>
+                  <span>By User {selectedContent.uploader_id?.slice(0, 8) || "Anonymous"}</span>
                 </div>
                 <div className="flex items-center">
                   <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-semibold">
-                    {selectedContent.minimum_age}+ Content
+                    18+ Content
                   </span>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Age Verification Modal */}
+      {showVerification && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center">
+                  <Shield className="h-5 w-5 mr-2 text-blue-600" />
+                  Age Verification Required
+                </h2>
+                <button 
+                  onClick={() => setShowVerification(false)} 
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <p className="text-gray-700 mb-6">
+                You must verify that you are 18 years or older to view this content.
+              </p>
+
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                {selfApp ? (
+                  <SelfQRcodeWrapper 
+                    selfApp={selfApp}
+                    onSuccess={() => {
+                      console.log('Age verification successful!')
+                      setIsAgeVerified(true)
+                      setShowVerification(false)
+                      setVerificationError(null)
+                      setIsVerifying(false)
+                      
+                      // Save verification status to localStorage
+                      try {
+                        localStorage.setItem('ageGateVerified', 'true')
+                        console.log('Age verification status saved to localStorage')
+                      } catch (error) {
+                        console.warn('Could not save verification status to localStorage:', error)
+                      }
+                    }}
+                    onError={(data: { error_code?: string; reason?: string; status?: string }) => {
+                      console.error('Self verification error:', data)
+                      
+                      let errorMessage = 'Verification failed. Please try again.'
+                      
+                      if (data.reason) {
+                        errorMessage = data.reason
+                      } else if (data.error_code) {
+                        switch(data.error_code) {
+                          case 'INVALID_INPUTS':
+                            errorMessage = 'Invalid verification data provided.'
+                            break
+                          case 'VERIFICATION_FAILED':
+                            errorMessage = 'Age verification failed. Please ensure you meet the age requirement.'
+                            break
+                          case 'INTERNAL_ERROR':
+                            errorMessage = 'Internal server error. Please try again later.'
+                            break
+                          default:
+                            errorMessage = 'Verification failed. Please try again.'
+                        }
+                      }
+                      
+                      setVerificationError(errorMessage)
+                      setIsVerifying(false)
+                    }}
+                  />
+                ) : (
+                  <div className="p-8 text-gray-500">
+                    {viewingUserId ? 'Initializing verification...' : 'Loading verification system...'}
+                  </div>
+                )}
+                
+                <p className="text-sm text-gray-600 mt-4 mb-2">
+                  Scan QR code with Self app to verify you are 18+ years old
+                </p>
+                <p className="text-xs text-gray-500">
+                  Don't have the Self app? Download it from your app store
+                </p>
+                
+                {isVerifying && (
+                  <div className="mt-4 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                    <span className="text-sm text-gray-600">Verifying...</span>
+                  </div>
+                )}
+              </div>
+              
+              {verificationError && (
+                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-700">{verificationError}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
