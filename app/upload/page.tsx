@@ -2,20 +2,94 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { Upload, ImageIcon, AlertCircle } from "lucide-react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { Upload, ImageIcon, AlertCircle, Shield, CheckCircle2 } from "lucide-react"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
 import { supabase } from "@/lib/supabase"
+import {
+    SelfQRcodeWrapper,
+    SelfAppBuilder,
+    type SelfApp,
+  } from "@selfxyz/qrcode";
+  import { v4 as uuidv4 } from 'uuid';
 
 export default function UploadPage() {
+  const router = useRouter()
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
-  const [minimumAge, setMinimumAge] = useState(18)
+  const minimumAge = 18 // Fixed minimum age for all content
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadStatus, setUploadStatus] = useState<"idle" | "success" | "error">("idle")
+  const [selfApp, setSelfApp] = useState<SelfApp | null>(null);
+  
+  // Age verification states
+  const [userId, setUserId] = useState<string | null>(null)
+  const [isVerified, setIsVerified] = useState(false)
+  const [verifiedAge, setVerifiedAge] = useState<number | null>(null)
+  const [isVerifying, setIsVerifying] = useState(false)
+  const [verificationError, setVerificationError] = useState<string | null>(null)
+  const [showVerification, setShowVerification] = useState(false)
+
+  // Generate userId and store in Supabase and localStorage
+  useEffect(() => {
+    const generateAndStoreUserId = async () => {
+      try {
+        // Check if user already has an uploader ID in localStorage
+        const existingUserId = localStorage.getItem('ageGateUploaderUserId')
+        
+        if (existingUserId) {
+          console.log('Using existing uploader user ID:', existingUserId)
+          setUserId(existingUserId)
+          return // Exit early if user ID already exists
+        }
+
+        // Generate new user ID only if one doesn't exist
+        const newUserId = uuidv4()
+        setUserId(newUserId)
+        
+        // Store uploader user ID in localStorage
+        localStorage.setItem('ageGateUploaderUserId', newUserId)
+        console.log('Generated and stored new uploader user ID:', newUserId)
+        
+        // Store userId in Supabase
+        const { error } = await supabase
+          .from('users')
+          .insert({ 
+            user_id: newUserId,
+            created_at: new Date().toISOString()
+          })
+        
+        if (error) {
+          console.error('Error storing user ID in Supabase:', error)
+        } else {
+          console.log('User ID stored in Supabase successfully')
+        }
+      } catch (error) {
+        console.error('Failed to handle user ID:', error)
+        // Fallback: create session-only ID
+        const fallbackUserId = uuidv4()
+        setUserId(fallbackUserId)
+      }
+    }
+    
+    generateAndStoreUserId()
+  }, [])
+
+  // Check if verification is needed when age verification changes
+  useEffect(() => {
+    if (isVerified && verifiedAge !== null) {
+      if (verifiedAge < minimumAge) {
+        setIsVerified(false)
+        setVerificationError(`You need to be at least ${minimumAge} years old to upload this type of content.`)
+      } else {
+        setVerificationError(null)
+      }
+    }
+  }, [isVerified, verifiedAge])
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -28,6 +102,49 @@ export default function UploadPage() {
       reader.readAsDataURL(file)
     }
   }
+
+
+
+  const startVerification = () => {
+    setShowVerification(true)
+    setVerificationError(null)
+  }
+
+    // Create Self app instance when verification is needed
+  useEffect(() => {
+    if (!userId) {
+      console.log('No userId available yet for Self app creation')
+      return
+    }
+    
+    console.log('Creating Self app for upload verification with userId:', userId)
+    
+    try {
+      const app = new SelfAppBuilder({
+        version: 2,
+        appName: "AgeGate",
+        scope: "agegate",
+        endpoint: "https://2f6b778ad88a.ngrok-free.app/api/verify",
+        logoBase64: "https://i.postimg.cc/mrmVf9hm/self.png",
+        userId: userId,
+        endpointType: "staging_https",
+        userIdType: "uuid",
+        userDefinedData: "Welcome to AgeGate!",
+        devMode: true,
+        disclosures: {
+          minimumAge: 18,
+          ofac: false,
+          excludedCountries:[],
+        }
+      }).build();
+      
+      console.log('Self app created successfully for upload page:', app)
+      setSelfApp(app);
+    } catch (error) {
+      console.error('Failed to create Self app for upload:', error)
+      setSelfApp(null)
+    }
+  }, [userId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -52,26 +169,32 @@ export default function UploadPage() {
         data: { publicUrl },
       } = supabase.storage.from("content-images").getPublicUrl(fileName)
 
-      // For demo purposes, we'll use a mock user ID
-      // In a real app, you'd get this from authentication
-      const mockUserId = "550e8400-e29b-41d4-a716-446655440000"
+      // Use the generated userId
+      if (!userId) {
+        throw new Error('User ID not available')
+      }
 
-      // Insert content record
+      // Insert content record with the Self Protocol user_id
       const { error: insertError } = await supabase.from("content").insert({
         title,
         description,
         image_url: publicUrl,
-        minimum_age: minimumAge,
-        uploader_id: mockUserId,
+        minimum_age: 18, // Fixed minimum age
+        uploader_id: userId,  // This is our Self Protocol UUID
       })
 
       if (insertError) throw insertError
 
       setUploadStatus("success")
+      
+      // Show success message briefly then redirect
+      setTimeout(() => {
+        router.push('/explore')
+      }, 2000)
+      
       // Reset form
       setTitle("")
       setDescription("")
-      setMinimumAge(18)
       setImageFile(null)
       setImagePreview(null)
     } catch (error) {
@@ -99,7 +222,7 @@ export default function UploadPage() {
             {/* Image Upload */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Content Image *</label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
+              <div className="relative border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
                 {imagePreview ? (
                   <div className="space-y-4">
                     <img
@@ -165,40 +288,140 @@ export default function UploadPage() {
               />
             </div>
 
-            {/* Minimum Age */}
-            <div>
-              <label htmlFor="minimumAge" className="block text-sm font-medium text-gray-700 mb-2">
-                Minimum Age Requirement *
-              </label>
-              <select
-                id="minimumAge"
-                value={minimumAge}
-                onChange={(e) => setMinimumAge(Number(e.target.value))}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value={13}>13+ (Teen)</option>
-                <option value={16}>16+ (Young Adult)</option>
-                <option value={18}>18+ (Adult)</option>
-                <option value={21}>21+ (Mature Adult)</option>
-              </select>
-              <p className="text-sm text-gray-500 mt-1">
-                Users must verify their age meets this requirement to view your content.
-              </p>
-            </div>
-
-            {/* Age Verification Notice */}
+            {/* Fixed Minimum Age Notice */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-start">
-                <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+              <div className="flex items-center">
+                <AlertCircle className="h-5 w-5 text-blue-600 mr-2" />
                 <div>
-                  <h3 className="text-sm font-medium text-blue-800">Age Verification Required</h3>
-                  <p className="text-sm text-blue-700 mt-1">
-                    Users will need to complete age verification through Self Protocol before they can access content
-                    with age restrictions. This ensures compliance and protects both creators and viewers.
-                  </p>
+                  <p className="text-sm font-medium text-blue-800">Age Restriction: 18+</p>
+                  <p className="text-sm text-blue-700">All content uploaded to this platform requires viewers to be 18 years or older.</p>
                 </div>
               </div>
             </div>
+
+            {/* Age Verification Section */}
+            {userId && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+                <div className="flex items-start">
+                  <Shield className="h-6 w-6 text-yellow-600 mt-1 mr-3 flex-shrink-0" />
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-yellow-800 mb-2">Age Verification Required</h3>
+                    <p className="text-yellow-700 mb-4">
+                      Since you're uploading content with a minimum age requirement of {minimumAge}+, you must first verify that you meet this age requirement yourself.
+                    </p>
+                    
+                    {!isVerified ? (
+                      <div>
+                        {!showVerification ? (
+                          <button
+                            type="button"
+                            onClick={startVerification}
+                            className="bg-yellow-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-yellow-700 transition-colors flex items-center"
+                          >
+                            <Shield className="h-4 w-4 mr-2" />
+                            Verify My Age ({minimumAge}+)
+                          </button>
+                        ) : (
+                          <div className="bg-white border border-yellow-300 rounded-lg p-4">
+                            <h4 className="font-medium text-gray-900 mb-3">Complete Age Verification</h4>
+                            
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                              {selfApp ? (
+                                <SelfQRcodeWrapper 
+                                  selfApp={selfApp}
+                                  onSuccess={() => {
+                                    // Verification completed successfully
+                                    // Backend now returns status: "success" with result: true
+                                                            console.log('Self Protocol verification successful!')
+                        setIsVerified(true)
+                        setVerifiedAge(18) // Fixed age verification
+                        setShowVerification(false)
+                        setVerificationError(null)
+                        setIsVerifying(false)
+                        
+                        // Save verification status for viewing content later
+                        try {
+                          localStorage.setItem('ageGateVerified', 'true')
+                          console.log('Age verification status saved for content viewing')
+                        } catch (error) {
+                          console.warn('Could not save verification status:', error)
+                        }
+                                  }}
+                                  onError={(data: { error_code?: string; reason?: string; status?: string }) => {
+                                    console.error('Self verification error:', data)
+                                    
+                                    let errorMessage = 'Verification failed. Please try again.'
+                                    
+                                    // Handle the new backend error format
+                                    if (data.reason) {
+                                      errorMessage = data.reason
+                                    } else if (data.error_code) {
+                                      switch(data.error_code) {
+                                        case 'INVALID_INPUTS':
+                                          errorMessage = 'Invalid verification data provided.'
+                                          break
+                                        case 'VERIFICATION_FAILED':
+                                          errorMessage = 'Age verification failed. Please ensure you meet the age requirement.'
+                                          break
+                                        case 'INTERNAL_ERROR':
+                                          errorMessage = 'Internal server error. Please try again later.'
+                                          break
+                                        default:
+                                          errorMessage = 'Verification failed. Please try again.'
+                                      }
+                                    }
+                                    
+                                    setVerificationError(errorMessage)
+                                    setIsVerifying(false)
+                                  }}
+                                />
+                              ) : (
+                                <div className="p-8 text-gray-500">
+                                  {userId ? 'Initializing verification...' : 'Loading user session...'}
+                                </div>
+                              )}
+                              
+                              <p className="text-sm text-gray-600 mt-4 mb-2">
+                                Scan QR code with Self app to verify you are {minimumAge}+ years old
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Don't have the Self app? Download it from your app store
+                              </p>
+                              
+                              {isVerifying && (
+                                <div className="mt-4 flex items-center justify-center">
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                                  <span className="text-sm text-gray-600">Verifying...</span>
+                                </div>
+                              )}
+                            </div>
+                            
+                            <button
+                              type="button"
+                              onClick={() => setShowVerification(false)}
+                              className="mt-4 text-sm text-gray-600 hover:text-gray-700"
+                            >
+                              Cancel Verification
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center text-green-700">
+                        <CheckCircle2 className="h-5 w-5 mr-2" />
+                        <span className="font-medium">Age verified for {minimumAge}+ content</span>
+                      </div>
+                    )}
+                    
+                    {verificationError && (
+                      <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-sm text-red-700">{verificationError}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Status Messages */}
             {uploadStatus === "success" && (
@@ -239,7 +462,7 @@ export default function UploadPage() {
             <div className="flex justify-end">
               <button
                 type="submit"
-                disabled={!imageFile || !title || isUploading}
+                disabled={!imageFile || !title || !userId || isUploading || !isVerified || (verifiedAge !== null && verifiedAge < minimumAge)}
                 className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center"
               >
                 {isUploading ? (
