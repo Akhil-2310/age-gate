@@ -118,7 +118,7 @@ export default function UploadPage() {
         endpoint: "https://age-gate-nine.vercel.app/api/verify",
         logoBase64: "https://i.postimg.cc/mrmVf9hm/self.png",
         userId: userId,
-        endpointType: "staging_https",
+        endpointType: "https",
         userIdType: "uuid",
         userDefinedData: "Welcome to AgeGate!",
         devMode: true,
