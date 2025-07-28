@@ -13,45 +13,70 @@ export default function MyContentPage() {
   const [uploadedContent, setUploadedContent] = useState<Content[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<"accessible" | "uploaded">("accessible")
-
-  // Mock user data - in real app, get from authentication
-  const mockUserId = "550e8400-e29b-41d4-a716-446655440000"
-  const userAge = 25
-  const isAgeVerified = true
+  const [uploaderUserId, setUploaderUserId] = useState<string | null>(null)
+  const [isAgeVerified, setIsAgeVerified] = useState(false)
 
   useEffect(() => {
-    fetchContent()
+    // Get uploader user ID and verification status from localStorage
+    try {
+      const storedUploaderUserId = localStorage.getItem('ageGateUploaderUserId')
+      const verificationStatus = localStorage.getItem('ageGateVerified')
+      
+      setUploaderUserId(storedUploaderUserId)
+      setIsAgeVerified(verificationStatus === 'true' || !!storedUploaderUserId)
+      
+      console.log('Uploader user ID:', storedUploaderUserId)
+      console.log('Is age verified:', verificationStatus === 'true' || !!storedUploaderUserId)
+    } catch (error) {
+      console.warn('localStorage not available:', error)
+    }
   }, [])
 
+  // Fetch content when uploaderUserId is determined
+  useEffect(() => {
+    fetchContent()
+  }, [uploaderUserId])
+
   const fetchContent = async () => {
+    console.log("=== My Content: Fetching content ===")
+    console.log("Uploader User ID:", uploaderUserId)
+    
     try {
-      // Fetch content user can access (based on age verification)
+      // Fetch all content (user can access if age verified)
       const { data: allContent, error: contentError } = await supabase
         .from("content")
-        .select(`
-          *,
-          uploader:users(name, email)
-        `)
+        .select("*")
         .eq("is_active", true)
-        .lte("minimum_age", userAge)
         .order("created_at", { ascending: false })
 
       if (contentError) throw contentError
 
-      // Fetch content uploaded by user
-      const { data: userContent, error: userContentError } = await supabase
-        .from("content")
-        .select(`
-          *,
-          uploader:users(name, email)
-        `)
-        .eq("uploader_id", mockUserId)
-        .order("created_at", { ascending: false })
+      // Fetch content uploaded by user (if they have uploaded before)
+      let userContent: Content[] = []
+      if (uploaderUserId) {
+        const { data, error: userContentError } = await supabase
+          .from("content")
+          .select("*")
+          .eq("uploader_id", uploaderUserId)
+          .order("created_at", { ascending: false })
 
-      if (userContentError) throw userContentError
+        if (userContentError) {
+          console.error("Error fetching user content:", userContentError)
+          throw userContentError
+        }
+        
+        userContent = data || []
+        console.log(`Found ${userContent.length} uploads for user ${uploaderUserId}`)
+        if (userContent.length > 0) {
+          console.log("Upload titles:", userContent.map(c => c.title))
+        }
+      } else {
+        console.log("No uploader user ID - user hasn't uploaded content yet")
+      }
 
       setAccessibleContent(allContent || [])
-      setUploadedContent(userContent || [])
+      setUploadedContent(userContent)
+      console.log(`Set ${allContent?.length || 0} accessible items, ${userContent.length} uploaded items`)
     } catch (error) {
       console.error("Error fetching content:", error)
     } finally {
@@ -143,12 +168,12 @@ export default function MyContentPage() {
 
                 {/* Age Badge */}
                 <div className="absolute top-2 right-2 bg-red-600 text-white px-2 py-1 rounded text-xs font-semibold">
-                  {item.minimum_age}+
+                  18+
                 </div>
 
                 {/* Access Status */}
                 <div className="absolute top-2 left-2">
-                  {isAgeVerified && userAge >= item.minimum_age ? (
+                  {isAgeVerified ? (
                     <div className="bg-green-600 text-white px-2 py-1 rounded text-xs font-semibold flex items-center">
                       <Eye className="h-3 w-3 mr-1" />
                       Accessible
@@ -172,7 +197,7 @@ export default function MyContentPage() {
                     <Calendar className="h-3 w-3 mr-1" />
                     <span>{new Date(item.created_at).toLocaleDateString()}</span>
                   </div>
-                  <span>By {item.uploader?.name || "Anonymous"}</span>
+                  <span>By User {item.uploader_id?.slice(0, 8) || "Anonymous"}</span>
                 </div>
 
                 {/* Actions for uploaded content */}
