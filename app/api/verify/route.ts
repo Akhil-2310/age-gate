@@ -17,11 +17,8 @@ export async function OPTIONS(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  console.log("=== Self.xyz Verification Request ===");
-  
   try {
     const body = await req.json();
-    console.log("Request body:", JSON.stringify(body, null, 2));
     
     const { 
       attestationId, 
@@ -33,21 +30,8 @@ export async function POST(req: NextRequest) {
     
     // Handle both parameter naming conventions
     const signals = publicSignals || pubSignals;
-    
-    console.log("Extracted parameters:");
-    console.log("- attestationId:", attestationId);
-    console.log("- proof:", proof ? "present" : "missing");
-    console.log("- publicSignals:", publicSignals ? "present" : "missing");
-    console.log("- pubSignals:", pubSignals ? "present" : "missing");
-    console.log("- signals (final):", signals ? "present" : "missing");
-    console.log("- userContextData:", userContextData ? "present" : "missing");
-    console.log("- All body keys:", Object.keys(body));
-    
 
     if (!proof || !signals || !attestationId || !userContextData) {
-      console.log("❌ Missing required parameters");
-      
-      
       return NextResponse.json({
         status: 'error',
         result: false,

@@ -24,9 +24,6 @@ export default function MyContentPage() {
       
       setUploaderUserId(storedUploaderUserId)
       setIsAgeVerified(verificationStatus === 'true' || !!storedUploaderUserId)
-      
-      console.log('Uploader user ID:', storedUploaderUserId)
-      console.log('Is age verified:', verificationStatus === 'true' || !!storedUploaderUserId)
     } catch (error) {
       console.warn('localStorage not available:', error)
     }
@@ -38,9 +35,6 @@ export default function MyContentPage() {
   }, [uploaderUserId])
 
   const fetchContent = async () => {
-    console.log("=== My Content: Fetching content ===")
-    console.log("Uploader User ID:", uploaderUserId)
-    
     try {
       // Fetch all content (user can access if age verified)
       const { data: allContent, error: contentError } = await supabase
@@ -66,17 +60,10 @@ export default function MyContentPage() {
         }
         
         userContent = data || []
-        console.log(`Found ${userContent.length} uploads for user ${uploaderUserId}`)
-        if (userContent.length > 0) {
-          console.log("Upload titles:", userContent.map(c => c.title))
-        }
-      } else {
-        console.log("No uploader user ID - user hasn't uploaded content yet")
       }
 
       setAccessibleContent(allContent || [])
       setUploadedContent(userContent)
-      console.log(`Set ${allContent?.length || 0} accessible items, ${userContent.length} uploaded items`)
     } catch (error) {
       console.error("Error fetching content:", error)
     } finally {

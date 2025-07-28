@@ -35,10 +35,8 @@ export default function ExplorePage() {
       const uploaderUserId = localStorage.getItem('ageGateUploaderUserId')
       
       if (savedVerificationStatus === 'true') {
-        console.log('User was previously age verified')
         setIsAgeVerified(true)
       } else if (uploaderUserId) {
-        console.log('User is an uploader, automatically verified:', uploaderUserId)
         setIsAgeVerified(true)
         // Save verification status for consistency
         localStorage.setItem('ageGateVerified', 'true')
@@ -57,9 +55,6 @@ export default function ExplorePage() {
         // Generate new ID only if one doesn't exist
         userId = uuidv4()
         localStorage.setItem('ageGateViewingUserId', userId)
-        console.log('Generated new viewing user ID:', userId)
-      } else {
-        console.log('Using existing viewing user ID:', userId)
       }
       
       setViewingUserId(userId)
@@ -96,8 +91,6 @@ export default function ExplorePage() {
   useEffect(() => {
     if (!viewingUserId) return
     
-    console.log('Creating Self app with userId:', viewingUserId)
-    
     try {
       const app = new SelfAppBuilder({
         version: 2,
@@ -117,7 +110,6 @@ export default function ExplorePage() {
         }
       }).build();
       
-      console.log('Self app created successfully:', app)
       setSelfApp(app);
     } catch (error) {
       console.error('Failed to create Self app:', error)
@@ -195,7 +187,6 @@ export default function ExplorePage() {
                     localStorage.removeItem('ageGateVerified')
                     localStorage.removeItem('ageGateViewingUserId')
                     setIsAgeVerified(false)
-                    console.log('Cleared age verification and user ID')
                     // Regenerate new viewing user ID
                     generateViewingUserId()
                   } catch (error) {
@@ -350,7 +341,6 @@ export default function ExplorePage() {
                   <SelfQRcodeWrapper 
                     selfApp={selfApp}
                     onSuccess={() => {
-                      console.log('Age verification successful!')
                       setIsAgeVerified(true)
                       setShowVerification(false)
                       setVerificationError(null)
@@ -359,7 +349,6 @@ export default function ExplorePage() {
                       // Save verification status to localStorage
                       try {
                         localStorage.setItem('ageGateVerified', 'true')
-                        console.log('Age verification status saved to localStorage')
                       } catch (error) {
                         console.warn('Could not save verification status to localStorage:', error)
                       }

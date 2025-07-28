@@ -42,7 +42,6 @@ export default function UploadPage() {
         const existingUserId = localStorage.getItem('ageGateUploaderUserId')
         
         if (existingUserId) {
-          console.log('Using existing uploader user ID:', existingUserId)
           setUserId(existingUserId)
           return // Exit early if user ID already exists
         }
@@ -53,7 +52,6 @@ export default function UploadPage() {
         
         // Store uploader user ID in localStorage
         localStorage.setItem('ageGateUploaderUserId', newUserId)
-        console.log('Generated and stored new uploader user ID:', newUserId)
         
         // Store userId in Supabase
         const { error } = await supabase
@@ -65,8 +63,6 @@ export default function UploadPage() {
         
         if (error) {
           console.error('Error storing user ID in Supabase:', error)
-        } else {
-          console.log('User ID stored in Supabase successfully')
         }
       } catch (error) {
         console.error('Failed to handle user ID:', error)
@@ -103,8 +99,6 @@ export default function UploadPage() {
     }
   }
 
-
-
   const startVerification = () => {
     setShowVerification(true)
     setVerificationError(null)
@@ -113,11 +107,8 @@ export default function UploadPage() {
     // Create Self app instance when verification is needed
   useEffect(() => {
     if (!userId) {
-      console.log('No userId available yet for Self app creation')
       return
     }
-    
-    console.log('Creating Self app for upload verification with userId:', userId)
     
     try {
       const app = new SelfAppBuilder({
@@ -138,7 +129,6 @@ export default function UploadPage() {
         }
       }).build();
       
-      console.log('Self app created successfully for upload page:', app)
       setSelfApp(app);
     } catch (error) {
       console.error('Failed to create Self app for upload:', error)
@@ -331,21 +321,18 @@ export default function UploadPage() {
                                   selfApp={selfApp}
                                   onSuccess={() => {
                                     // Verification completed successfully
-                                    // Backend now returns status: "success" with result: true
-                                                            console.log('Self Protocol verification successful!')
-                        setIsVerified(true)
-                        setVerifiedAge(18) // Fixed age verification
-                        setShowVerification(false)
-                        setVerificationError(null)
-                        setIsVerifying(false)
-                        
-                        // Save verification status for viewing content later
-                        try {
-                          localStorage.setItem('ageGateVerified', 'true')
-                          console.log('Age verification status saved for content viewing')
-                        } catch (error) {
-                          console.warn('Could not save verification status:', error)
-                        }
+                                    setIsVerified(true)
+                                    setVerifiedAge(18) // Fixed age verification
+                                    setShowVerification(false)
+                                    setVerificationError(null)
+                                    setIsVerifying(false)
+                                    
+                                    // Save verification status for viewing content later
+                                    try {
+                                      localStorage.setItem('ageGateVerified', 'true')
+                                    } catch (error) {
+                                      console.warn('Could not save verification status:', error)
+                                    }
                                   }}
                                   onError={(data: { error_code?: string; reason?: string; status?: string }) => {
                                     console.error('Self verification error:', data)
