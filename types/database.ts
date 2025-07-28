@@ -1,11 +1,7 @@
 export interface User {
     id: string
-    email: string
-    name: string
-    age?: number
-    is_age_verified: boolean
+    user_id: string  // The UUID we generate for Self Protocol
     created_at: string
-    updated_at: string
   }
   
   export interface Content {
