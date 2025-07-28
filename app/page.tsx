@@ -39,7 +39,7 @@ export default function HomePage() {
             </div>
             <div className="relative">
               <Image
-                src="/placeholder.svg?height=500&width=600"
+                src="/logo.png?height=500&width=600"
                 alt="Secure Content Platform"
                 width={600}
                 height={500}
