@@ -10,6 +10,8 @@ A Next.js application that provides secure age verification for content sharing 
 - **User Content Management**: Users can manage their uploaded content
 - **Persistent Sessions**: Age verification persists across browser sessions
 
+## [Demo](https://www.loom.com/share/e741436e1e2c46b684b9540d7dc95baf)
+
 ## Tech Stack
 
 - **Frontend**: Next.js 14, React 18, TypeScript, Tailwind CSS
@@ -55,48 +57,7 @@ A Next.js application that provides secure age verification for content sharing 
    - Update the endpoint URL in the code to match your ngrok tunnel
    - For production, replace with your production API endpoint
 
-## Database Setup
 
-Run this SQL in your Supabase SQL editor:
-
-```sql
--- Create users table
-CREATE TABLE users (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  user_id UUID NOT NULL UNIQUE, -- Self Protocol UUID
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Create content table
-CREATE TABLE content (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  title TEXT NOT NULL,
-  description TEXT,
-  image_url TEXT NOT NULL,
-  minimum_age INTEGER NOT NULL DEFAULT 18,
-  uploader_id UUID NOT NULL,
-  is_active BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Add foreign key constraint
-ALTER TABLE content 
-ADD CONSTRAINT content_uploader_id_fkey 
-FOREIGN KEY (uploader_id) REFERENCES users(user_id) ON DELETE CASCADE;
-
--- Create indexes for performance
-CREATE INDEX idx_users_user_id ON users(user_id);
-CREATE INDEX idx_content_uploader_id ON content(uploader_id);
-CREATE INDEX idx_content_active ON content(is_active);
-
--- Enable Row Level Security
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE content ENABLE ROW LEVEL SECURITY;
-
--- Create policies (adjust as needed for your security requirements)
-CREATE POLICY "Allow all operations on users" ON users FOR ALL USING (true);
-CREATE POLICY "Allow all operations on content" ON content FOR ALL USING (true);
 ```
 
 ## Development
@@ -174,31 +135,11 @@ agegate/
 - Self Protocol uses these UUIDs for verification
 - Content ownership is tracked via uploader_id field
 
-### Content Management
 
-- Users can upload images with titles and descriptions
-- All content has a fixed 18+ age restriction
-- Users can view and delete their own content
-- Content can be soft-deleted (is_active flag)
 
-## Security Considerations
 
-- Age verification is handled by Self Protocol's secure system
-- No sensitive user data is stored on the platform
-- Content access is properly gated behind age verification
-- Database uses Row Level Security (RLS) policies
 
-## Known Limitations
 
-- Currently uses ngrok for development (replace with production endpoint)
-- Fixed 18+ age requirement (could be made configurable)
-- Basic content moderation (could be enhanced)
-- Single file upload only (could support multiple files)
 
-## Support
 
-For issues related to:
-- **Self Protocol**: Check Self Protocol documentation
-- **Supabase**: Check Supabase documentation  
-- **Next.js**: Check Next.js documentation
 
