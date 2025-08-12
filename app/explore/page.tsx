@@ -102,7 +102,6 @@ export default function ExplorePage() {
         endpointType: "https",
         userIdType: "uuid",
         userDefinedData: "Welcome to AgeGate!",
-        devMode: true,
         disclosures: {
           minimumAge: 18,
           ofac: false,

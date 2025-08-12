@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     const selfBackendVerifier = new SelfBackendVerifier(
       "agegate",
       "https://age-gate-nine.vercel.app/api/verify",
-      true, // dev mode
+      false, // dev mode
       AllIds,
       configStore,
       "uuid", // user ID type as string
