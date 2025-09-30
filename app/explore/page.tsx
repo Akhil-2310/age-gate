@@ -96,10 +96,10 @@ export default function ExplorePage() {
         version: 2,
         appName: "AgeGate",
         scope: "agegate",
-        endpoint: "https://age-gate-nine.vercel.app/api/verify",
+        endpoint: "0xb6b9918c5880f7a1a4c65c4c4b6297956b4c39ad",
         logoBase64: "https://i.postimg.cc/mrmVf9hm/self.png",
         userId: viewingUserId,
-        endpointType: "https",
+        endpointType: "celo",
         userIdType: "uuid",
         userDefinedData: "Welcome to AgeGate!",
         disclosures: {

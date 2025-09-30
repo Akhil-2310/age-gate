@@ -9,8 +9,9 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@selfxyz/core": "^1.0.7-beta.1",
-    "@selfxyz/qrcode": "^1.0.10-beta.1",
+    "@selfxyz/contracts": "^1.2.0",
+    "@selfxyz/core": "^1.0.8",
+    "@selfxyz/qrcode": "^1.0.11",
     "@supabase/supabase-js": "^2.52.1",
     "@types/uuid": "^10.0.0",
     "lucide-react": "^0.526.0",
