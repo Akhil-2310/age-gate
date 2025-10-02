@@ -12,6 +12,8 @@ A Next.js application that provides secure age verification for content sharing 
 
 ## [Demo](https://www.loom.com/share/e741436e1e2c46b684b9540d7dc95baf)
 
+## [Contract Address](https://celoscan.io/address/0xb6b9918c5880f7a1a4c65c4c4b6297956b4c39ad)
+
 ## Tech Stack
 
 - **Frontend**: Next.js 14, React 18, TypeScript, Tailwind CSS
